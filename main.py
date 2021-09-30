@@ -9,6 +9,8 @@ from processer import *
 from utils.args import get_args
 from transformers import BertTokenizer, BertPreTrainedModel, BertConfig
 from model import CRFModel
+from train import train
+
 
 
 def main():
@@ -19,10 +21,9 @@ def main():
 
     tokenizer = BertTokenizer(os.path.join(args.bert_dir, 'vocab.txt'))
     config = BertConfig(os.path.join(args.bert_dir, 'config.json'), num_labels=len(ent2id))
-    modle = CRFModel.from_pretrained(os.path.join(args.bert_dir, 'pytorch_model.bin'), config=config)
+    model = CRFModel.from_pretrained(os.path.join(args.bert_dir, 'pytorch_model.bin'), config=config)
 
-    features = convert2features(args, 'train', tokenizer, ent2id)
-
+    train(args, model, tokenizer, ent2id)
 
 
 
