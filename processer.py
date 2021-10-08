@@ -30,6 +30,8 @@ def convert2features(args, data_type, tokenizer, ent2id):
     if data_type == 'train':
         examples = read_data(os.path.join(args.data_dir, 'train.json'))     # 850 组数据
         # dict_keys(['id', 'text', 'labels', 'pseudo', 'candidate_entities'])
+    elif data_type == 'eval':
+        examples = read_data(os.path.join(args.data_dir, 'dev.json'))
 
     for i, example in enumerate(examples):
         text = example['text']
