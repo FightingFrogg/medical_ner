@@ -21,7 +21,7 @@ class CRFModel(BertPreTrainedModel):
         bert_outputs = self.dropout(bert_outputs)
         emission = self.classifier(bert_outputs)
         if labels is not None:
-            loss = self.crf(emissions=emission, mask=attention_mask.byte(), tags=labels.long(), reduction='none')
+            loss = self.crf(emissions=emission, mask=attention_mask.byte(), tags=labels.long(), reduction='mean')
             outputs = (loss,)
         else:
             out = self.crf.decode(emissions=emission, mask=attention_mask.byte())
