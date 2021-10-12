@@ -6,18 +6,44 @@ from processer import *
 import torch
 from torch.utils.data import TensorDataset, RandomSampler, DataLoader
 from transformers import AdamW, get_linear_schedule_with_warmup
+from torch.utils.data import Dataset
+from tqdm import trange, tqdm
+
+
+class NERDataset(Dataset):
+    def __init__(self, task_type, features, mode):
+
+        self.nums = len(features)
+
+        self.all_token_idx = torch.tensor([f.token_idx for f in features], dtype=torch.long)
+        self.all_attention_mask = torch.tensor([f.attention_mask for f in features], dtype=torch.long)
+        self.all_token_type_idx = torch.tensor([f.token_type_idx for f in features], dtype=torch.long)
+
+        self.all_labels = None
+
+        if mode == 'train':
+            if task_type == 'crf':
+                self.all_labels = torch.tensor([f.labels for f in features], dtype=torch.long)
+
+    def __len__(self):
+        return self.nums
+
+    def __getitem__(self, index):
+        data = {'token_idx': self.all_token_idx[index],
+                'attention_mask': self.all_attention_mask[index],
+                'token_type_idx': self.all_token_type_idx[index]}
+
+        if self.all_labels is not None:
+            data['labels'] = self.all_labels[index]
+
+        return data
 
 
 def train(args, model, tokenizer, ent2id):
 
     features = convert2features(args, 'train', tokenizer, ent2id)
 
-    all_token_idx = torch.tensor([f.token_idx for f in features], dtype=torch.long)
-    all_attention_mask = torch.tensor([f.attention_mask for f in features], dtype=torch.long)
-    all_labels = torch.tensor([f.labels for f in features], dtype=torch.long)
-    all_token_type_idx = torch.tensor([f.token_type_idx for f in features], dtype=torch.long)
-
-    data_set = TensorDataset(all_token_idx, all_token_type_idx, all_attention_mask, all_labels)
+    data_set = NERDataset('crf', features, 'train')
 
     data_sampler = RandomSampler(data_set)
     loader = DataLoader(dataset=data_set, sampler=data_sampler, batch_size=args.batch_size)
@@ -27,14 +53,14 @@ def train(args, model, tokenizer, ent2id):
 
     model.to(args.device)
 
-    for epoch in range(args.epoch):
-        for step, batch_data in enumerate(loader):
+    for epoch in trange(args.epoch):
+        for step, batch_data in enumerate(tqdm(loader)):
             model.train()
 
             for key in batch_data.keys():
                 batch_data[key] = batch_data[key].to(args.device)
 
-            loss = model(**batch_data)
+            loss = model(**batch_data)[0]
             loss.backward()
             torch.nn.utils.clip_grad_norm(model.parameters(), args.max_grad_norm)
             optimizer.step()
@@ -45,7 +71,7 @@ def train(args, model, tokenizer, ent2id):
 
 
 def eval(args, model, tokenizer, ent2id):
-    features = convert2features(args, 'dev', tokenizer, ent2id)
+    features = convert2features(args, 'eval', tokenizer, ent2id)
 
     all_token_idx = torch.tensor([f.token_idx for f in features], dtype=torch.long)
     all_attention_mask = torch.tensor([f.attention_mask for f in features], dtype=torch.long)
@@ -57,16 +83,16 @@ def eval(args, model, tokenizer, ent2id):
     data_sampler = RandomSampler(data_set)
     loader = DataLoader(dataset=data_set, sampler=data_sampler, batch_size=args.batch_size)
 
-    for step,batch_data in enumerate(loader):
+    for step, batch_data in enumerate(tqdm(loader)):
         model.eval()
         batch_data = tuple(t.to(args.device) for t in batch_data)
 
         with torch.no_grad():
-            inputs = {'emission': batch_data[0], 'mask': batch_data[2]}
+            inputs = {'token_idx': batch_data[0], 'token_type_idx': batch_data[1], 'attention_mask': batch_data[2]}
             out = model(**inputs)
 
-        print(out.shape())
-        print(batch_data[3].shape())
+        print(out)
+        print(batch_data[3])
 
 
 
@@ -79,19 +105,19 @@ def build_optimizer_scheduler(args, model, t_total):
     classifier_param_optim = list(model.classifier.named_parameters())
 
     optimizer_grouped_parameters = [
-        {"param": [param for name, param in bert_param_optim if not any(nd in no_decay for nd in name)],
+        {"params": [param for name, param in bert_param_optim if not any(nd in no_decay for nd in name)],
          "weight_decay": args.weight_decay, "lr": args.lr},
-        {"param": [param for name, param in bert_param_optim if any(nd in no_decay for nd in name)],
+        {"params": [param for name, param in bert_param_optim if any(nd in no_decay for nd in name)],
          "weight_decay": 0.0, "lr": args.lr},
 
-        {"param": [param for name, param in crf_param_optim if not any(nd in no_decay for nd in name)],
+        {"params": [param for name, param in crf_param_optim if not any(nd in no_decay for nd in name)],
          "weight_decay": args.weight_decay, "lr": args.crf_lr},
-        {"param": [param for name, param in crf_param_optim if any(nd in no_decay for nd in name)],
+        {"params": [param for name, param in crf_param_optim if any(nd in no_decay for nd in name)],
          "weight_decay": 0.0, "lr": args.crf_lr},
 
-        {"param": [param for name, param in classifier_param_optim if not any(nd in no_decay for nd in name)],
+        {"params": [param for name, param in classifier_param_optim if not any(nd in no_decay for nd in name)],
          "weight_decay": args.weight_decay, "lr": args.crf_lr},
-        {"param": [param for name, param in classifier_param_optim if any(nd in no_decay for nd in name)],
+        {"params": [param for name, param in classifier_param_optim if any(nd in no_decay for nd in name)],
          "weight_decay": 0.0, "lr": args.crf_lr},
     ]
 

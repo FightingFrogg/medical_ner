@@ -13,7 +13,7 @@ def get_args():
     parser.add_argument('--bert_dir', default='./bert/torch_roberta_wwm')
     parser.add_argument('--output_dir', default='./save/')
     parser.add_argument('--max_seq_len', default=512)
-    parser.add_argument('--batch_size', default=32)
+    parser.add_argument('--batch_size', default=24)
     parser.add_argument('--epoch', default=10)
     parser.add_argument('--weight_decay', default=0.01)
     parser.add_argument('--lr', default=2e-5)

@@ -22,9 +22,14 @@ def main():
     with open(os.path.join(args.data_dir, 'crf_ent2id.json')) as f:
         ent2id = json.load(f)
 
+    # hfl/chinese-roberta-wwm-ext
+    # tokenizer = BertTokenizer.from_pretrained('hfl/chinese-roberta-wwm-ext')
+    # config = BertConfig.from_pretrained('hfl/chinese-roberta-wwm-ext')
+    # model = CRFModel.from_pretrained('hfl/chinese-roberta-wwm-ext', config=config)
+    config = BertConfig.from_pretrained(args.bert_dir)
+    config.num_labels = len(ent2id)
+    model = CRFModel.from_pretrained(args.bert_dir, config=config)
     tokenizer = BertTokenizer(os.path.join(args.bert_dir, 'vocab.txt'))
-    config = BertConfig(os.path.join(args.bert_dir, 'config.json'), num_labels=len(ent2id))
-    model = CRFModel.from_pretrained(os.path.join(args.bert_dir, 'pytorch_model.bin'), config=config)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     args.device = device
@@ -39,8 +44,8 @@ def main():
 
     if args.eval:
         # 加载保存的 tokenizer
-        tokenizer = BertTokenizer.from_pretrained(args.output_dir, do_lower_case=True)
-        model = CRFModel.from_pretrained(args.output_dir, config=config)
+        tokenizer = BertTokenizer.from_pretrained(args.bert_dir, do_lower_case=True)
+        model = CRFModel.from_pretrained(args.bert_dir, config=config)
         model.to(args.device)
 
         eval(args, model, tokenizer, ent2id)
