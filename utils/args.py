@@ -7,13 +7,14 @@ import argparse
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train', default=True)
+    parser.add_argument('--train', default=False)
     parser.add_argument('--eval', default=True)
     parser.add_argument('--data_dir', default='./data')
     parser.add_argument('--bert_dir', default='./bert/torch_roberta_wwm')
-    parser.add_argument('--output_dir', default='./save/')
+    parser.add_argument('--output_dir', default='./save')
     parser.add_argument('--max_seq_len', default=512)
-    parser.add_argument('--batch_size', default=24)
+    parser.add_argument('--batch_size', default=8)
+    parser.add_argument('--eval_batch_size', default=64)
     parser.add_argument('--epoch', default=10)
     parser.add_argument('--weight_decay', default=0.01)
     parser.add_argument('--lr', default=2e-5)

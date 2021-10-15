@@ -8,6 +8,7 @@ from torch.utils.data import TensorDataset, RandomSampler, DataLoader
 from transformers import AdamW, get_linear_schedule_with_warmup
 from torch.utils.data import Dataset
 from tqdm import trange, tqdm
+from utils.metric import Metric
 
 
 class NERDataset(Dataset):
@@ -62,6 +63,7 @@ def train(args, model, tokenizer, ent2id):
 
             loss = model(**batch_data)[0]
             loss.backward()
+            print('loss: ', loss.item())
             torch.nn.utils.clip_grad_norm(model.parameters(), args.max_grad_norm)
             optimizer.step()
             scheduler.step()
@@ -72,6 +74,8 @@ def train(args, model, tokenizer, ent2id):
 
 def eval(args, model, tokenizer, ent2id):
     features = convert2features(args, 'eval', tokenizer, ent2id)
+    id2ent = {ent2id[key]: key for key in ent2id.keys()}        # {1:'B-DRUG_GROUP',  ...}
+    metric = Metric(id2ent=id2ent)
 
     all_token_idx = torch.tensor([f.token_idx for f in features], dtype=torch.long)
     all_attention_mask = torch.tensor([f.attention_mask for f in features], dtype=torch.long)
@@ -83,6 +87,7 @@ def eval(args, model, tokenizer, ent2id):
     data_sampler = RandomSampler(data_set)
     loader = DataLoader(dataset=data_set, sampler=data_sampler, batch_size=args.batch_size)
 
+    pred_outputs = []
     for step, batch_data in enumerate(tqdm(loader)):
         model.eval()
         batch_data = tuple(t.to(args.device) for t in batch_data)
@@ -90,10 +95,25 @@ def eval(args, model, tokenizer, ent2id):
         with torch.no_grad():
             inputs = {'token_idx': batch_data[0], 'token_type_idx': batch_data[1], 'attention_mask': batch_data[2]}
             out = model(**inputs)
+            pred_outputs.append(out[0])
 
-        print(out)
-        print(batch_data[3])
+        labels = batch_data[3].cpu().numpy().tolist()
+        tags = out[0]       # 包括了 cls 和 sep
+        for i, tag in enumerate(tags):
+            temp_tags = []
+            temp_labels = []
+            for j, t in enumerate(tag):
+                if j == 0:
+                    continue        # 跳过 cls
+                elif j == len(tag) - 2:       # 跳过 sep
+                    metric.update([temp_labels], [temp_tags])
+                    break
+                else:
+                    temp_labels.append(id2ent[labels[i][j]])
+                    temp_tags.append(id2ent[tag[j]])
 
+    # 计算 p, r, f
+    metric.result()
 
 
 def build_optimizer_scheduler(args, model, t_total):

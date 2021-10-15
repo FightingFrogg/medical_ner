@@ -6,7 +6,7 @@
 import json
 import os
 
-import torch.types
+import torch
 
 from processer import *
 from utils.args import get_args
@@ -38,14 +38,14 @@ def main():
         train(args, model, tokenizer, ent2id)
 
         # 保存模型
-        model.save_pretrain(args.output_dir)
+        model.save_pretrained(args.output_dir)
         # 保存 tokenizer
         tokenizer.save_vocabulary(args.output_dir)
 
     if args.eval:
         # 加载保存的 tokenizer
-        tokenizer = BertTokenizer.from_pretrained(args.bert_dir, do_lower_case=True)
-        model = CRFModel.from_pretrained(args.bert_dir, config=config)
+        tokenizer = BertTokenizer.from_pretrained(args.output_dir, do_lower_case=True)
+        model = CRFModel.from_pretrained(args.output_dir, config=config)
         model.to(args.device)
 
         eval(args, model, tokenizer, ent2id)

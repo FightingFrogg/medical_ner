@@ -21,10 +21,10 @@ class CRFModel(BertPreTrainedModel):
         bert_outputs = self.dropout(bert_outputs)
         emission = self.classifier(bert_outputs)
         if labels is not None:
-            loss = self.crf(emissions=emission, mask=attention_mask.byte(), tags=labels.long(), reduction='mean')
+            loss = -1. * self.crf(emissions=emission, mask=attention_mask.byte(), tags=labels.long(), reduction='mean')
             outputs = (loss,)
         else:
-            out = self.crf.decode(emissions=emission, mask=attention_mask.byte())
+            out = self.crf.decode(emissions=emission, mask=attention_mask.byte())   # 返回每一个 batch 的预测序列
             outputs = (out, emission)
 
         return outputs
