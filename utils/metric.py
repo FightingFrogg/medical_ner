@@ -59,6 +59,6 @@ class Metric(object):
         right = len(self.rights)
         recall, precision, f1 = self.compute(origin, found, right)
 
-        print('Precision: {}\nRecall: {}\nF1: {}\n'.format(precision, recall, f1))
+        # print('Precision: {}\nRecall: {}\nF1: {}\n'.format(precision, recall, f1))
         # 第一个返回值为所有标签的 metric，第二个返回值记录了不同标签分别的 metric
         return {'precision': precision, 'recall': recall, 'f1': f1}, class_info

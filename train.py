@@ -113,7 +113,9 @@ def eval(args, model, tokenizer, ent2id):
                     temp_tags.append(id2ent[tag[j]])
 
     # 计算 p, r, f
-    metric.result()
+    all_metric, entity_metric = metric.result()
+
+    return all_metric
 
 
 def build_optimizer_scheduler(args, model, t_total):

@@ -12,6 +12,7 @@ def get_args():
     parser.add_argument('--data_dir', default='./data')
     parser.add_argument('--bert_dir', default='./bert/torch_roberta_wwm')
     parser.add_argument('--output_dir', default='./save')
+    parser.add_argument('--log_output_dir', default='./log')
     parser.add_argument('--max_seq_len', default=512)
     parser.add_argument('--batch_size', default=8)
     parser.add_argument('--eval_batch_size', default=64)
