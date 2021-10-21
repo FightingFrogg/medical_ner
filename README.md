@@ -2,4 +2,5 @@
 
 BERT: hfl/chinese-roberta-wwm-ext
 
-CRF SPAN
+CRF 
+SPAN
