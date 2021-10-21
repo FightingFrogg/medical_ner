@@ -12,8 +12,8 @@ import time
 from processer import *
 from utils.args import get_args
 from transformers import BertTokenizer, BertPreTrainedModel, BertConfig
-from model import CRFModel
-from train import train, eval
+from model import CRFModel, SpanModel
+from train import train, eval, span_eval
 
 
 def init_log(args, info='log'):
@@ -40,8 +40,12 @@ def main():
     init_log(args)      # info='log'
     logging.info('-------Start-------')
 
-    with open(os.path.join(args.data_dir, 'crf_ent2id.json')) as f:
-        ent2id = json.load(f)
+    if args.task_type == 'crf':
+        with open(os.path.join(args.data_dir, 'crf_ent2id.json')) as f:
+            ent2id = json.load(f)
+    elif args.task_type == 'span':
+        with open(os.path.join(args.data_dir, 'span_ent2id.json')) as f:
+            ent2id = json.load(f)
 
     # hfl/chinese-roberta-wwm-ext
     # tokenizer = BertTokenizer.from_pretrained('hfl/chinese-roberta-wwm-ext')
@@ -49,8 +53,13 @@ def main():
     # model = CRFModel.from_pretrained('hfl/chinese-roberta-wwm-ext', config=config)
     config = BertConfig.from_pretrained(args.bert_dir)
     config.num_labels = len(ent2id)
-    model = CRFModel.from_pretrained(args.bert_dir, config=config)
     tokenizer = BertTokenizer(os.path.join(args.bert_dir, 'vocab.txt'))
+
+    model = None
+    if args.task_type == 'crf':
+        model = CRFModel.from_pretrained(args.bert_dir, config=config)
+    elif args.task_type == 'span':
+        model = SpanModel.from_pretrained(args.bert_dir, config=config)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     args.device = device
@@ -68,10 +77,17 @@ def main():
         logging.info('Evaluation...')
         # 加载保存的 tokenizer
         tokenizer = BertTokenizer.from_pretrained(args.output_dir, do_lower_case=True)
-        model = CRFModel.from_pretrained(args.output_dir, config=config)
+        if args.task_type == 'crf':
+            model = CRFModel.from_pretrained(args.output_dir, config=config)
+        elif args.task_type == 'span':
+            model = SpanModel.from_pretrained(args.output_dir, config=config)
         model.to(args.device)
 
-        all_metric = eval(args, model, tokenizer, ent2id)
+        if args.task_type == 'crf':
+            all_metric = eval(args, model, tokenizer, ent2id)
+        elif args.task_type == 'span':
+            all_metric = span_eval(args, model, tokenizer, ent2id)
+
         logging.info('Metric')
         logging.info('Precision: {} Recall: {} F1: {}\n'
                      .format(round(all_metric['precision'], 4), round(all_metric['recall'], 4), round(all_metric['f1'], 4)))

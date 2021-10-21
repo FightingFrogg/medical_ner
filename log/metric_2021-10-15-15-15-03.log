@@ -1,8 +1,0 @@
-10/15/2021 15:15:03 - INFO - root : -------Start------- 
-10/15/2021 15:15:05 - INFO - root : Evaluation... 
-10/15/2021 15:17:30 - INFO - root : Metric 
-10/15/2021 15:17:30 - INFO - root : Precision: 0.6872 Recall: 0.7657 F1: 0.7243
-
-
-# 没有进行长句子截断
- 

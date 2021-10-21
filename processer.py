@@ -16,14 +16,27 @@ class Examples:
         self.labels = labels
 
 
-
-class CRFFeature():
-    def __init__(self, token_idx, attention_mask, token_type_idx, labels, text):
+class BaseFeature():
+    def __init__(self, token_idx, attention_mask, token_type_idx, text):
         self.token_idx = token_idx
         self.attention_mask = attention_mask
         self.token_type_idx = token_type_idx
-        self.labels = labels
         self.text = text
+
+
+class CRFFeature(BaseFeature):
+    def __init__(self, token_idx, attention_mask, token_type_idx, text, labels):
+        super(CRFFeature, self).__init__(token_idx, attention_mask, token_type_idx, text)
+
+        self.labels = labels
+
+
+class SpanFeature(BaseFeature):
+    def __init__(self, token_idx, attention_mask, token_type_idx, text, start_idx, end_idx):
+        super(SpanFeature, self).__init__(token_idx, attention_mask, token_type_idx, text)
+
+        self.start_idx = start_idx
+        self.end_idx = end_idx
 
 
 def read_data(file_name):
@@ -136,19 +149,19 @@ def refactor_labels(sent, labels, start_idx):
     return new_labels
 
 
-def convert2features(args, data_type, tokenizer, ent2id):
+def convert_crf_features(args, data_type, tokenizer, ent2id):
     examples = None
     features = []
 
     if data_type == 'train':
         raw_examples = read_data(os.path.join(args.data_dir, 'train.json'))     # 850 组数据
         # dict_keys(['id', 'text', 'labels', 'pseudo', 'candidate_entities'])
-        # 长句子截取
+        # 长句子截断
         examples = get_sentence(raw_examples, 'train')
 
     elif data_type == 'eval':
         raw_examples = read_data(os.path.join(args.data_dir, 'dev.json'))       # 150 组数据
-        # 长句子截取
+        # 长句子截断
         examples = get_sentence(raw_examples, 'eval')
 
     for i, example in enumerate(examples):
@@ -191,6 +204,69 @@ def convert2features(args, data_type, tokenizer, ent2id):
                                    token_type_idx=token_type_idx,
                                    labels=labels,
                                    text=tokens))
+
+    return features
+
+
+def convert_span_features(args, data_type, tokenizer, ent2id):
+    examples = None
+    features = []
+
+    if data_type == 'train':
+        raw_examples = read_data(os.path.join(args.data_dir, 'train.json'))  # 850 组数据
+        # dict_keys(['id', 'text', 'labels', 'pseudo', 'candidate_entities'])
+        # 长句子截断
+        examples = get_sentence(raw_examples, 'train')
+
+    elif data_type == 'eval':
+        raw_examples = read_data(os.path.join(args.data_dir, 'dev.json'))  # 150 组数据
+        # 长句子截断
+        examples = get_sentence(raw_examples, 'eval')
+
+    for i, example in enumerate(examples):
+        text = example.text      # 76 个字。 len: 75
+        entities = example.labels
+        tokens = fine_grade_tokenize(text, tokenizer)       # 分词，将字转换成 token，将空格和未登录的词转换成指定的 tonken。 len: 76
+        encode_dict = tokenizer.encode_plus(text=tokens,
+                                           max_length=args.max_seq_len,
+                                           pad_to_max_length=True,
+                                           return_token_type_ids=True,
+                                           return_attention_mask=True,
+                                           is_pretokenize=True)
+        tokens_idx = encode_dict['input_ids']           # 将 token 转换成 idx，并在首尾添加 cls 和 sep 标签，并补零。 有效长度 len: 78
+        token_type_idx = encode_dict['token_type_ids']  # 只有一句话，全为 0
+        attention_mask = encode_dict['attention_mask']  # 将 cls 和 sep 标签一并进行 mask。有效长度 len: 78
+
+        start_idx = [0] * len(tokens)
+        end_idx = [0] * len(tokens)
+        for entity in entities:
+            ent_type = ent2id[entity[1]]
+            ent_satrt = entity[2]
+            ent_end = entity[3] - 1
+            start_idx[ent_satrt] = ent_type     # 在命名实体的开始位置和结束位置都设置为实体类型的 idx
+            end_idx[ent_end] = ent_type
+
+        if len(start_idx) > args.max_seq_len - 2:
+            start_idx = start_idx[:args.max_seq_len - 2]
+            end_idx = end_idx[:args.max_seq_len - 2]
+
+        start_idx = [0] + start_idx + [0]
+        end_idx = [0] + end_idx + [0]
+
+        if len(start_idx) < args.max_seq_len:
+            pad_len = args.max_seq_len - len(start_idx)
+            start_idx += [0] * pad_len
+            end_idx += [0] * pad_len
+
+        assert len(start_idx) == args.max_seq_len
+        assert len(end_idx) == args.max_seq_len
+
+        features.append(SpanFeature(token_idx=tokens_idx,
+                                    attention_mask=attention_mask,
+                                    token_type_idx=token_type_idx,
+                                    text=tokens,
+                                    start_idx=start_idx,
+                                    end_idx=end_idx))
 
     return features
 

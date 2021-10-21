@@ -17,7 +17,7 @@ class Metric(object):
         self.rights = []
 
 
-    def update(self, labels, tags):
+    def update(self, labels, tags, flag='crf'):
         '''
         labels_paths: [[],[],[],....]
         pred_paths: [[],[],[],.....]
@@ -30,8 +30,12 @@ class Metric(object):
             >>> pred_paths = [['O', 'O', 'B-MISC', 'I-MISC', 'I-MISC', 'I-MISC', 'O'], ['B-PER', 'I-PER', 'O']]
         '''
         for label, tag in zip(labels, tags):
-            label_entities = get_entities(label, self.id2ent)
-            tag_entities = get_entities(tag, self.id2ent)
+            if flag == 'crf':
+                label_entities = get_entities(label, self.id2ent)
+                tag_entities = get_entities(tag, self.id2ent)
+            else:
+                label_entities = labels
+                tag_entities = tags
             self.origins.extend(label_entities)
             self.founds.extend(tag_entities)
             self.rights.extend([tag_entity for tag_entity in tag_entities if tag_entity in label_entities])

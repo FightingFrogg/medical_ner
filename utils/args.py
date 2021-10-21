@@ -7,6 +7,7 @@ import argparse
 
 def get_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--task_type', default='span', help='crf / span / mrc')
     parser.add_argument('--train', default=False)
     parser.add_argument('--eval', default=True)
     parser.add_argument('--data_dir', default='./data')
