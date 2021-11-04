@@ -1,0 +1,6 @@
+10/15/2021 20:07:37 - INFO - root : -------Start------- 
+10/15/2021 20:07:38 - INFO - root : Evaluation... 
+10/15/2021 20:10:33 - INFO - root : Metric 
+10/15/2021 20:10:33 - INFO - root : Precision: 0.6957 Recall: 0.736 F1: 0.7153
+ 
+# 进行了长句子分割

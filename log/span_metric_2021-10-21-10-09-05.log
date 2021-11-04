@@ -1,0 +1,5 @@
+10/21/2021 10:09:05 - INFO - root : -------Start------- 
+10/21/2021 10:09:06 - INFO - root : Evaluation... 
+10/21/2021 10:11:52 - INFO - root : Metric 
+10/21/2021 10:11:52 - INFO - root : Precision: 0.6841 Recall: 0.7441 F1: 0.7129
+ 

@@ -1,0 +1,7 @@
+10/22/2021 07:59:37 - INFO - root : -------Start------- 
+10/22/2021 07:59:53 - INFO - root : Train... 
+10/22/2021 08:02:53 - INFO - root : MRC dataset 写入 json 文件 
+10/22/2021 09:04:53 - INFO - root : Evaluation... 
+10/22/2021 09:20:51 - INFO - root : Metric 
+10/22/2021 09:20:51 - INFO - root : Precision: 0.7118 Recall: 0.8309 F1: 0.7667
+ 

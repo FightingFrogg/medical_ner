@@ -3,8 +3,11 @@
 # datetime:2021/9/29 16:35
 
 import json
+import logging
 import os
 import re
+from collections import defaultdict
+from tqdm import tqdm
 
 class Examples:
     def __init__(self,
@@ -37,6 +40,15 @@ class SpanFeature(BaseFeature):
 
         self.start_idx = start_idx
         self.end_idx = end_idx
+
+
+class MRCFeature(BaseFeature):
+    def __init__(self, token_idx, attention_mask, token_type_idx, text, start_idx, end_idx, entity_type):
+        super(MRCFeature, self).__init__(token_idx, attention_mask, token_type_idx, text)
+
+        self.start_idx = start_idx
+        self.end_idx = end_idx
+        self.entity_type = entity_type
 
 
 def read_data(file_name):
@@ -267,6 +279,96 @@ def convert_span_features(args, data_type, tokenizer, ent2id):
                                     text=tokens,
                                     start_idx=start_idx,
                                     end_idx=end_idx))
+
+    return features
+
+
+def convert_mrc_features(args, data_type, tokenizer, ent2query):
+    ENTITY_TYPES = ['DRUG', 'DRUG_INGREDIENT', 'DISEASE', 'SYMPTOM', 'SYNDROME', 'DISEASE_GROUP',
+                    'FOOD', 'FOOD_GROUP', 'PERSON_GROUP', 'DRUG_GROUP', 'DRUG_DOSAGE', 'DRUG_TASTE',
+                    'DRUG_EFFICACY']
+    type2id = {x: i for i, x in enumerate(ENTITY_TYPES)}
+
+    examples = None
+    features = []
+    if data_type == 'train':
+        raw_examples = read_data(os.path.join(args.data_dir, 'train.json'))  # 850 组数据
+        # dict_keys(['id', 'text', 'labels', 'pseudo', 'candidate_entities'])
+        # 长句子截断
+        examples = get_sentence(raw_examples, 'train', args.max_seq_len-args.mrc_query_len)
+    elif data_type == 'eval':
+        raw_examples = read_data(os.path.join(args.data_dir, 'dev.json'))  # 150 组数据
+        # 长句子截断
+        examples = get_sentence(raw_examples, 'eval', args.max_seq_len-args.mrc_query_len)
+
+    print('Creat features...')
+    for i, example in enumerate(tqdm(examples)):
+        feature = []
+        text_b = example.text
+        entities = example.labels
+        tokens_b = fine_grade_tokenize(text_b, tokenizer)  # 分词，将字转换成 token，将空格和未登录的词转换成指定的 tonken。 len: 76
+
+        label_dict = defaultdict(list)      # 会构建一个默认value为list的字典
+        for entity in entities:
+            ent_type = entity[1]
+            ent_start = entity[2]
+            ent_end = entity[3] - 1
+            label_dict[ent_type].append((ent_start, ent_end, entity[0]))
+
+        for entity in ENTITY_TYPES:
+            start_idx = [0] * len(tokens_b)
+            end_idx = [0] * len(tokens_b)
+
+            text_a = ent2query[entity]
+            tokens_a = fine_grade_tokenize(text_a, tokenizer)
+
+            stop_mask_ranges = []       # 用于随机 mask
+            for labels in label_dict[entity]:
+                start_idx[labels[0]] = 1
+                end_idx[labels[1]] = 1
+                stop_mask_ranges.append((labels[0], labels[1]))
+
+            if len(start_idx) > args.max_seq_len - len(tokens_a) - 3:
+                start_idx = start_idx[:args.max_seq_len - len(tokens_a) - 3]
+                end_idx = end_idx[:args.max_seq_len - len(tokens_a) - 3]
+                print('产生了不该有的截断')
+
+            start_idx = [0] + [0] * len(tokens_a) + [0] + start_idx + [0]
+            end_idx = [0] + [0] * len(tokens_a) + [0] + end_idx + [0]
+
+            # pad
+            if len(start_idx) < args.max_seq_len:
+                pad_length = args.max_seq_len - len(start_idx)
+
+                start_idx = start_idx + [0] * pad_length  # CLS SEP PAD label都为O
+                end_idx = end_idx + [0] * pad_length
+
+            assert len(start_idx) == args.max_seq_len
+            assert len(end_idx) == args.max_seq_len
+
+            # 随机mask ##################
+
+            encode_dict = tokenizer.encode_plus(text=tokens_a,
+                                                text_pair=tokens_b,
+                                                max_length=args.max_seq_len,
+                                                truncation_strategy='only_second',
+                                                pad_to_max_length=True,
+                                                return_token_type_ids=True,
+                                                return_attention_mask=True,
+                                                is_pretokenize=True)
+            tokens_idx = encode_dict['input_ids']  # 将 token 转换成 idx，并在首尾添加 cls 和 sep 标签，并补零。 有效长度 len: 78
+            token_type_idx = encode_dict['token_type_ids']  # 只有一句话，全为 0
+            attention_mask = encode_dict['attention_mask']  # 将 cls 和 sep 标签一并进行 mask。有效长度 len: 78
+
+            feature.append(MRCFeature(token_idx=tokens_idx,
+                                        attention_mask=attention_mask,
+                                        token_type_idx=token_type_idx,
+                                        text=tokens_b,
+                                        start_idx=start_idx,
+                                        end_idx=end_idx,
+                                        entity_type=type2id[entity]))
+
+        features.extend(feature)
 
     return features
 

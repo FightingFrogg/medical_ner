@@ -12,8 +12,8 @@ import time
 from processer import *
 from utils.args import get_args
 from transformers import BertTokenizer, BertPreTrainedModel, BertConfig
-from model import CRFModel, SpanModel
-from train import train, eval, span_eval
+from model import CRFModel, SpanModel, MRCModel
+from train import train, eval, span_eval, mrc_eval
 
 
 def init_log(args, info='log'):
@@ -39,12 +39,18 @@ def main():
     args = get_args()
     init_log(args)      # info='log'
     logging.info('-------Start-------')
+    logging.info('-------args:-------')
+    logging.info('task_type: {}'.format(args.task_type))
+    logging.info('attack: {}'.format(args.attack))
 
     if args.task_type == 'crf':
         with open(os.path.join(args.data_dir, 'crf_ent2id.json')) as f:
             ent2id = json.load(f)
     elif args.task_type == 'span':
         with open(os.path.join(args.data_dir, 'span_ent2id.json')) as f:
+            ent2id = json.load(f)
+    elif args.task_type == 'mrc':
+        with open(os.path.join(args.data_dir, 'mrc_ent2id.json'), encoding='utf-8') as f:
             ent2id = json.load(f)
 
     # hfl/chinese-roberta-wwm-ext
@@ -60,6 +66,8 @@ def main():
         model = CRFModel.from_pretrained(args.bert_dir, config=config)
     elif args.task_type == 'span':
         model = SpanModel.from_pretrained(args.bert_dir, config=config)
+    elif args.task_type == 'mrc':
+        model = MRCModel.from_pretrained(args.bert_dir, config=config)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     args.device = device
@@ -67,7 +75,6 @@ def main():
     if args.train:
         logging.info('Train...')
         train(args, model, tokenizer, ent2id)
-
         # 保存模型
         model.save_pretrained(args.output_dir)
         # 保存 tokenizer
@@ -81,12 +88,17 @@ def main():
             model = CRFModel.from_pretrained(args.output_dir, config=config)
         elif args.task_type == 'span':
             model = SpanModel.from_pretrained(args.output_dir, config=config)
+        elif args.task_type == 'mrc':
+            model = MRCModel.from_pretrained(args.output_dir, config=config)
+
         model.to(args.device)
 
         if args.task_type == 'crf':
             all_metric = eval(args, model, tokenizer, ent2id)
         elif args.task_type == 'span':
             all_metric = span_eval(args, model, tokenizer, ent2id)
+        elif args.task_type == 'mrc':
+            all_metric = mrc_eval(args, model, tokenizer, ent2id)
 
         logging.info('Metric')
         logging.info('Precision: {} Recall: {} F1: {}\n'
